@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
 
+import itdelatrisu.opsu.Utils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Controller;
 import org.lwjgl.input.Controllers;
@@ -352,9 +353,12 @@ public class Input {
 	private static ArrayList controllers = new ArrayList();
 
 	/** The last recorded mouse x position */
-	private int lastMouseX;
+	private float mouseX;
 	/** The last recorded mouse y position */
-	private int lastMouseY;
+	private float mouseY;
+	/** The mouse sensitivity */
+	private float mouseSensitivity = 1f;
+	private boolean didGrabStateJustChange;
 	/** THe state of the mouse buttons */
 	protected boolean[] mousePressed = new boolean[10];
 	/** THe state of the controller buttons */
@@ -400,15 +404,7 @@ public class Input {
 	
 	/** True if the input is currently paused */
 	private boolean paused;
-	/** The scale to apply to screen coordinates */
-	private float scaleX = 1;
-	/** The scale to apply to screen coordinates */
-	private float scaleY = 1;
-	/** The offset to apply to screen coordinates */
-	private float xoffset = 0;
-	/** The offset to apply to screen coordinates */
-	private float yoffset = 0;
-	
+
 	/** The delay before determining a single or double click */
 	private int doubleClickDelay = 250;
 	/** The timer running out for a single click */
@@ -422,11 +418,11 @@ public class Input {
 	private int clickButton;
 
 	/** The x position location the mouse was pressed */
-	private int pressedX = -1;
-	
+	private float pressedX = -1;
+
 	/** The x position location the mouse was pressed */
-	private int pressedY = -1;
-	
+	private float pressedY = -1;
+
 	/** The pixel distance the mouse can move to accept a mouse click */
 	private int mouseClickTolerance = 5;
 
@@ -469,35 +465,14 @@ public class Input {
 	}
 
 	/**
-	 * Set the scaling to apply to screen coordinates
-	 * 
-	 * @param scaleX The scaling to apply to the horizontal axis
-	 * @param scaleY The scaling to apply to the vertical axis
+	 * Sets the mouse sensitivity.
+	 *
+	 * @param mouseSensitivity The new mouse sensitivity
 	 */
-	public void setScale(float scaleX, float scaleY) {
-		this.scaleX = scaleX;
-		this.scaleY = scaleY;
+	public void setMouseSensitivity(float mouseSensitivity) {
+		this.mouseSensitivity = mouseSensitivity;
 	}
-	
-	/**
-	 * Set the offset to apply to the screen coodinates
-	 * 
-	 * @param xoffset The offset on the x-axis
-	 * @param yoffset The offset on the y-axis
-	 */
-	public void setOffset(float xoffset, float yoffset) {
-		this.xoffset = xoffset;
-		this.yoffset = yoffset;
-	}
-	
-	/**
-	 * Reset the transformation being applied to the input to the default
-	 */
-	public void resetInputTransform() {
-	    setOffset(0, 0);
-	    setScale(1, 1);
-	}
-	
+
 	/**
 	 * Add a listener to be notified of input events
 	 * 
@@ -674,8 +649,8 @@ public class Input {
 	 */
 	void init(int height) {
 		this.height = height;
-		lastMouseX = getMouseX();
-		lastMouseY = getMouseY();
+		mouseX = Mouse.getX();
+		mouseY = height - Mouse.getY() - 1;
 	}
 	
 	/**
@@ -791,7 +766,7 @@ public class Input {
 	 * @return The absolute x position of the mouse cursor
 	 */
 	public int getAbsoluteMouseX() {
-		return Mouse.getX();
+		return (int) mouseX;
 	}
 
 	/**
@@ -800,7 +775,7 @@ public class Input {
 	 * @return The absolute y position of the mouse cursor
 	 */
 	public int getAbsoluteMouseY() {
-		return height - Mouse.getY() - 1;
+		return height - (int) mouseY - 1;
 	}
 	   
 	/**
@@ -809,7 +784,7 @@ public class Input {
 	 * @return The x position of the mouse cursor
 	 */
 	public int getMouseX() {
-		return (int) ((getAbsoluteMouseX() * scaleX)+xoffset);
+		return getAbsoluteMouseX();
 	}
 	
 	/**
@@ -818,7 +793,7 @@ public class Input {
 	 * @return The y position of the mouse cursor
 	 */
 	public int getMouseY() {
-		return (int) ((getAbsoluteMouseY() * scaleY)+yoffset);
+		return getAbsoluteMouseY();
 	}
 	
 	/**
@@ -1223,22 +1198,26 @@ public class Input {
 				}
 			}
 		}
-		
+
+		float oldMouseX = mouseX;
+		float oldMouseY = mouseY;
 		while (Mouse.next()) {
+			didGrabStateJustChange = false;
+			System.out.println("" + Mouse.isGrabbed() + " " + mouseX + " " + mouseY);
 			if (Mouse.getEventButton() >= 0 && Mouse.getEventButton() < mousePressed.length) {
 				if (Mouse.getEventButtonState()) {
 					consumed = false;
 					mousePressed[Mouse.getEventButton()] = true;
 
-					pressedX = (int) (xoffset + (Mouse.getEventX() * scaleX));
-					pressedY =  (int) (yoffset + ((height-Mouse.getEventY()-1) * scaleY));
-					lastMouseX = pressedX;
-					lastMouseY = pressedY;
+					pressedX = mouseX + Mouse.getEventDX() * mouseSensitivity;
+					pressedY = height - (mouseY + Mouse.getEventDY() * mouseSensitivity) - 1;
+					mouseX = pressedX;
+					mouseY = pressedY;
 
 					for (int i=0;i<mouseListeners.size();i++) {
 						MouseListener listener = (MouseListener) mouseListeners.get(i);
 						if (listener.isAcceptingInput()) {
-							listener.mousePressed(Mouse.getEventButton(), pressedX, pressedY);
+							listener.mousePressed(Mouse.getEventButton(), (int) pressedX, (int) pressedY);
 							if (consumed) {
 								break;
 							}
@@ -1248,10 +1227,10 @@ public class Input {
 					consumed = false;
 					mousePressed[Mouse.getEventButton()] = false;
 					
-					int releasedX = (int) (xoffset + (Mouse.getEventX() * scaleX));
-					int releasedY = (int) (yoffset + ((height-Mouse.getEventY()-1) * scaleY));
-					if ((pressedX != -1) && 
-					    (pressedY != -1) &&
+					int releasedX = (int) (mouseX + Mouse.getEventDX() * mouseSensitivity);
+					int releasedY = height - (int) (mouseY + Mouse.getEventDY() * mouseSensitivity) - 1;
+					if ((pressedX != -1f) &&
+					    (pressedY != -1f) &&
 						(Math.abs(pressedX - releasedX) < mouseClickTolerance) && 
 						(Math.abs(pressedY - releasedY) < mouseClickTolerance)) {
 						considerDoubleClick(Mouse.getEventButton(), releasedX, releasedY);
@@ -1276,11 +1255,12 @@ public class Input {
 							MouseListener listener = (MouseListener) mouseListeners.get(i);
 							if (listener.isAcceptingInput()) {
 								if (anyMouseDown()) {
-									listener.mouseDragged(0, 0, Mouse.getEventDX(), -Mouse.getEventDY());	
+									// TODO: apply sensistivity here?
+									listener.mouseDragged(0, 0, (int) (Mouse.getEventDX() * mouseSensitivity), (int) (-Mouse.getEventDY() * mouseSensitivity));
 								} else {
-									listener.mouseMoved(0, 0, Mouse.getEventDX(), -Mouse.getEventDY());
+									listener.mouseMoved(0, 0, (int) (Mouse.getEventDX() * mouseSensitivity), (int) (-Mouse.getEventDY() * mouseSensitivity));
 								}
-								
+
 								if (consumed) {
 									break;
 								}
@@ -1305,31 +1285,9 @@ public class Input {
 				}
 			}
 		}
-		
-		if (!displayActive || Mouse.isGrabbed()) {
-			lastMouseX = getMouseX();
-			lastMouseY = getMouseY();
-		} else {
-			if ((lastMouseX != getMouseX()) || (lastMouseY != getMouseY())) {
-				consumed = false;
-				for (int i=0;i<mouseListeners.size();i++) {
-					MouseListener listener = (MouseListener) mouseListeners.get(i);
-					if (listener.isAcceptingInput()) {
-						if (anyMouseDown()) {
-							listener.mouseDragged(lastMouseX ,  lastMouseY, getMouseX(), getMouseY());
-						} else {
-							listener.mouseMoved(lastMouseX ,  lastMouseY, getMouseX(), getMouseY());	
-						}
-						if (consumed) {
-							break;
-						}
-					}
-				}
-				lastMouseX = getMouseX();
-				lastMouseY = getMouseY();
-			}
-		}
-		
+		mouseX = oldMouseX + Mouse.getDX() * mouseSensitivity;
+		mouseY = oldMouseY + Mouse.getDY() * mouseSensitivity;
+
 		if (controllersInited) {
 			for (int i=0;i<getControllerCount();i++) {
 				int count = ((Controller) controllers.get(i)).getButtonCount()+3;
@@ -1381,7 +1339,64 @@ public class Input {
 		
 		if (Display.isCreated()) {
 			displayActive = Display.isActive();
+			if (didGrabStateJustChange) {
+				return;
+			}
+			if (Mouse.isGrabbed()) {
+				if (!displayActive) {
+					Mouse.setGrabbed(false);
+					didGrabStateJustChange = true;
+				} else if (mouseX < 0 || Display.getWidth() < mouseX || mouseY < 0 || Display.getHeight() < mouseY) {
+					if (anyMouseDown()) {
+						mouseX = Utils.clamp(mouseX, 0, Display.getWidth() - 1);
+						mouseY = Utils.clamp(mouseY, 0, Display.getHeight() - 1);
+					} else {
+						restoreMousePosition();
+						didGrabStateJustChange = true;
+						System.out.println("restored " + mouseX + " " + mouseY);
+					}
+				}
+			} else if (Mouse.isInsideWindow()) {
+				mouseX = Mouse.getX();
+				mouseY = Mouse.getY();
+				if (displayActive) {
+					Mouse.setGrabbed(true);
+					didGrabStateJustChange = true;
+					System.out.println("grabbing " + mouseX + " " + mouseY);
+					// reset deltas
+					Mouse.getDX();
+					Mouse.getDY();
+				}
+			}
 		}
+	}
+
+	private void restoreMousePosition() {
+		if (Mouse.isGrabbed()) {
+			Mouse.setGrabbed(false);
+		}
+		int releaseX = (int) this.mouseX;
+		int releaseY = (int) this.mouseY;
+		if (mouseX < 2) {
+			this.mouseX = 0f;
+			releaseX = -3;
+		}
+		if (mouseX > Display.getWidth()) {
+			this.mouseX = Display.getWidth() - 1;
+			releaseX = Display.getWidth() + 2;
+		}
+		if (mouseY < 2) {
+			this.mouseY = 0f;
+			releaseY = -3;
+		}
+		if (mouseY > Display.getHeight()) {
+			this.mouseY = Display.getHeight() - 1;
+			releaseY = Display.getHeight() + 2;
+		}
+		Mouse.setCursorPosition(releaseX, releaseY);
+		while (Mouse.next());
+		Mouse.getDX();
+		Mouse.getDY();
 	}
 	
 	/**

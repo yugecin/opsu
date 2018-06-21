@@ -76,6 +76,7 @@ public class Container extends AppGameContainer {
 		try {
 			runSetup();
 			getDelta();
+			Options.init(this);
 			while (running())
 				gameLoop();
 		} catch (Exception e) {

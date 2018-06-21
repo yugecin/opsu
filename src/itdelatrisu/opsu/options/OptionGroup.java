@@ -96,6 +96,7 @@ public class OptionGroup {
 		new OptionGroup("MOUSE", new GameOption[] {
 			GameOption.DISABLE_MOUSE_WHEEL,
 			GameOption.DISABLE_MOUSE_BUTTONS,
+			GameOption.MOUSE_SENSITIVITY,
 		}),
 		new OptionGroup("KEYBOARD", new GameOption[] {
 			GameOption.KEY_LEFT,

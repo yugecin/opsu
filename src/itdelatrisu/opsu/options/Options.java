@@ -148,6 +148,9 @@ public class Options {
 	/** The theme song timing point string (for computing beats to pulse the logo) . */
 	private static String themeTimingPoint = "1120,545.454545454545,4,1,0,100,0,0";
 
+	/** Holds a reference to the game container instance. */
+	private static GameContainer gameContainer;
+
 	/**
 	 * Returns whether the XDG flag in the manifest (if any) is set to "true".
 	 * @return true if XDG directories are enabled, false otherwise
@@ -561,6 +564,16 @@ public class Options {
 		},
 		DISABLE_MOUSE_WHEEL ("Disable mouse wheel in play mode", "MouseDisableWheel", "During play, you can use the mouse wheel to adjust the volume and pause the game.\nThis will disable that functionality.", false),
 		DISABLE_MOUSE_BUTTONS ("Disable mouse buttons in play mode", "MouseDisableButtons", "This option will disable all mouse buttons.\nSpecifically for people who use their keyboard to click.", false),
+		MOUSE_SENSITIVITY ("Mouse sensitivity", "MouseSensitivity", "Adjusts mouse movement sensitivity.", 100, 10, 600) {
+			@Override
+			public String getValueString() {
+				return String.format("%.1f", val / 100f);
+			}
+			@Override
+			public void valueChanged() {
+				updateMouseSensitivity();
+			}
+		},
 		DISABLE_CURSOR ("Disable cursor", "DisableCursor", "Hides the cursor sprite.", false),
 		BACKGROUND_DIM ("Background dim", "DimLevel", "Percentage to dim the background image during gameplay.", 50, 0, 100),
 		FORCE_DEFAULT_PLAYFIELD ("Force default playfield", "ForceDefaultPlayfield", "Overrides the song background with the default playfield background.", false),
@@ -812,6 +825,11 @@ public class Options {
 		 * @param value the new integer value
 		 */
 		public void setValue(int value) { this.val = Utils.clamp(value, min, max); }
+
+		/**
+		 * If this option is controlled by a slider, this will be called when the slider has been released.
+		 */
+		public void valueChanged() {}
 
 		/**
 		 * Toggles the boolean value for the option, if applicable.
@@ -1654,4 +1672,19 @@ public class Options {
 			ErrorHandler.error(String.format("Failed to write to file '%s'.", OPTIONS_FILE.getAbsolutePath()), e, false);
 		}
 	}
+
+	private static void updateMouseSensitivity() {
+		float mp = GameOption.MOUSE_SENSITIVITY.getIntegerValue() / 100f;
+		gameContainer.getInput().setMouseSensitivity(mp);
+	}
+
+	/**
+	 * Inits the options after the game started.
+	 * @param app the game container
+	 */
+	public static void init(GameContainer app) {
+		gameContainer = app;
+		updateMouseSensitivity();
+	}
+
 }

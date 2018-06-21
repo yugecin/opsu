@@ -1186,6 +1186,7 @@ public class OptionsOverlay extends AbstractComponent {
 		if (isAdjustingSlider) {
 			isAdjustingSlider = false;
 			adjustSlider(x, y);
+			hoverOption.valueChanged();
 		}
 
 		// check if clicked, not dragged
